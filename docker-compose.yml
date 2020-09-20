@@ -1,0 +1,50 @@
+version: "3"
+
+networks:
+ traefik:
+   external:
+     name: public
+
+volumes:
+  db:
+
+services:
+  mariadb:
+    image: "mariadb:10.4"
+    restart: unless-stopped
+    volumes:
+      - db:/var/lib/mysql
+    environment:
+      - MYSQL_ROOT_PASSWORD=${MYSQL_ROOT_PASSWORD}
+
+  adminer:
+    image: adminer
+    restart: unless-stopped
+    networks:
+      - traefik
+      - default
+    depends_on:
+      - mariadb
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.wpdev-adminer.rule=host(`adminer.${DOMAIN:-wordpress.lan}`)"
+      - "traefik.http.routers.wpdev-adminer.entrypoints=http, https"
+
+  wordpress:
+    build: 
+        context: .
+        args: 
+            wwwdata_uid: ${WWWDATA_USER:-1000}
+            wwwdata_gid: ${WWWDATA_GROUP:-1000}
+    image: wordpress:wp_develop
+    restart: unless-stopped
+    networks:
+     - traefik
+     - default
+    volumes:
+      - ${WORDPRESS_DATA}:/var/www/html
+
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.wpdev-web.rule=host(`${DOMAIN:-wordpress.lan}`)"
+      - "traefik.http.routers.wpdev-web.entrypoints=http, https"
